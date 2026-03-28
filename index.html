@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart Bin AI</title>
+
+    <!-- ✅ FIXED VERSION (NO @latest) -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial;
+            text-align: center;
+        }
+
+        canvas {
+            border: 2px solid black;
+            margin-top: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>Smart Bin AI</h2>
+
+<button onclick="init()">Start Camera</button>
+
+<h3 id="result">Waiting...</h3>
+
+<div id="webcam-container"></div>
+<div id="label-container"></div>
+
+<script>
+    const URL = "https://teachablemachine.withgoogle.com/models/5WvHgY8X_/";
+
+    let model, webcam, labelContainer, maxPredictions;
+
+    async function init() {
+        try {
+            // ✅ SAFETY CHECK
+            if (typeof tmImage === "undefined") {
+                alert("Library NOT loaded. Check internet.");
+                return;
+            }
+
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            // ✅ LOAD MODEL
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+
+            // ✅ SETUP CAMERA
+            webcam = new tmImage.Webcam(300, 300, true);
+            await webcam.setup();
+            await webcam.play();
+
+            window.requestAnimationFrame(loop);
+
+            // ✅ DISPLAY CAMERA (NO DUPLICATES)
+            const container = document.getElementById("webcam-container");
+            container.innerHTML = "";
+            container.appendChild(webcam.canvas);
+
+            // ✅ LABELS RESET
+            labelContainer = document.getElementById("label-container");
+            labelContainer.innerHTML = "";
+
+            for (let i = 0; i < maxPredictions; i++) {
+                labelContainer.appendChild(document.createElement("div"));
+            }
+
+        } catch (e) {
+            console.error("FULL ERROR:", e);
+            alert("Error: " + e.message);
+        }
+    }
+
+    async function loop() {
+        webcam.update();
+        await predict();
+        window.requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+        const prediction = await model.predict(webcam.canvas);
+
+        let best = prediction[0];
+
+        for (let i = 0; i < prediction.length; i++) {
+            if (prediction[i].probability > best.probability) {
+                best = prediction[i];
+            }
+        }
+
+        // ✅ MAIN RESULT
+        document.getElementById("result").innerText =
+            best.className + " (" + (best.probability * 100).toFixed(2) + "%)";
+
+        // ✅ ALL LABELS
+        for (let i = 0; i < maxPredictions; i++) {
+            const text =
+                prediction[i].className + ": " +
+                (prediction[i].probability * 100).toFixed(2) + "%";
+
+            labelContainer.childNodes[i].innerHTML = text;
+        }
+    }
+</script>
+
+</body>
+</html>
